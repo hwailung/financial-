@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>威龍顧問 - 家族財富全情境導航系統 (Full-Screen Edition)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { 
+            --p: #1e3799; --s: #d35400; --st: #c0392b; --r: #27ae60; --bg: #f0f2f5; 
+            --sidebar-w: 420px;
+        }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; 
+            background: var(--bg); 
+            margin: 0; 
+            padding: 0; 
+            color: #333; 
+            overflow-x: hidden;
+        }
+        
+        /* 滿版容器 */
+        .dashboard {
+            display: grid;
+            grid-template-columns: var(--sidebar-w) 1fr;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* 左側設定區 */
+        .sidebar {
+            background: #fff;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+        }
+
+        /* 右側展示區 */
+        .main-display {
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        .header {
+            margin-bottom: 20px;
+            border-left: 6px solid var(--p);
+            padding-left: 15px;
+        }
+        .header h1 { margin: 0; font-size: 24px; color: var(--p); }
+        .header p { margin: 5px 0 0 0; color: #666; font-size: 14px; }
+
+        /* 分頁切換 */
+        .tabs { display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 1px solid #eee; }
+        .tab-btn { 
+            flex: 1; padding: 10px; cursor: pointer; border: none; background: #f8f9fa; 
+            border-radius: 5px 5px 0 0; font-weight: bold; font-size: 13px; transition: 0.2s;
+        }
+        .tab-btn.active { background: var(--p); color: white; }
+        .tab-content { display: none; padding-top: 10px; }
+        .tab-content.active { display: block; }
+
+        .section-box { background: #fdfdfd; padding: 15px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 15px; }
+        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        label { font-size: 12px; font-weight: bold; color: #555; display: block; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; }
+
+        .phase-card { background: #f1f3f8; padding: 12px; border-radius: 6px; border-left: 4px solid var(--p); margin-bottom: 10px; }
+        .alloc-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 8px; margin-bottom: 5px; }
+        
+        /* 右側卡片 */
+        .results-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .res-card { padding: 15px; border-radius: 12px; text-align: center; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .val-large { font-size: 22px; font-weight: bold; margin: 5px 0; }
+        .val-label { font-size: 12px; opacity: 0.9; }
+
+        .chart-container { 
+            flex: 1; 
+            background: #fff; 
+            border-radius: 15px; 
+            padding: 25px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            min-height: 500px;
+        }
+
+        .btn-group { display: flex; gap: 10px; margin-top: auto; padding-top: 20px; }
+        .btn-group button { 
+            flex: 1; padding: 15px; border: none; border-radius: 8px; 
+            font-weight: bold; cursor: pointer; transition: 0.3s; font-size: 15px;
+        }
+        .calc-btn { background: var(--p); color: white; }
+        .lock-btn { background: #2c3e50; color: white; }
+
+        @media print {
+            .sidebar { display: none !important; }
+            .dashboard { display: block; }
+            .main-display { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="sidebar">
+        <div class="header">
+            <h1>威龍顧問</h1>
+            <p>家族財富全情境導航系統</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" id="btn-t1" onclick="switchTab('t1')">1. 三階段累積</button>
+            <button class="tab-btn" id="btn-t2" onclick="switchTab('t2')">2. 稅務與事件</button>
+            <button class="tab-btn" id="btn-t3" onclick="switchTab('t3')">3. 風險預演</button>
+        </div>
+
+        <div id="t1" class="tab-content active">
+            <div class="section-box">
+                <div class="input-row">
+                    <div><label>目前年齡</label><input type="number" id="curAge" value="45"></div>
+                    <div><label>退休年齡</label><input type="number" id="retAge" value="65"></div>
+                </div>
+                <div class="input-row">
+                    <div><label>起始本金 (萬)</label><input type="number" id="initP" value="800"></div>
+                    <div><label>通膨率 %</label><input type="number" id="infRate" value="2.5"></div>
+                </div>
+                <div class="phase-card">
+                    <label>第一階段 (衝刺期) | 年期: <input type="number" id="y1" value="10" style="width:40px; display:inline;"> 年</label>
+                    <div class="alloc-grid" style="margin-top:5px;"><select id="p1_s1" onchange="upR(1,1)"><option value="sp500">S&P 500</option></select><input type="number" id="p1_r1" value="10.5"><input type="number" id="p1_w1" value="80"></div>
+                    <div class="alloc-grid"><select id="p1_s2" onchange="upR(1,2)"><option value="deposit">台幣定存</option></select><input type="number" id="p1_r2" value="3.5"><input type="number" id="p1_w2" value="20"></div>
+                    <label style="margin-top:5px;">每月額外投入 (元)</label><input type="number" id="m1" value="40000">
+                </div>
+                <div class="phase-card" style="border-left-color: #3498db;">
+                    <label>第二階段 (穩健期) | 年期: <input type="number" id="y2" value="5" style="width:40px; display:inline;"> 年</label>
+                    <div class="alloc-grid"><select id="p2_s1" onchange="upR(2,1)"><option value="tw0050">0050</option></select><input type="number" id="p2_r1" value="9.8"><input type="number" id="p2_w1" value="50"></div>
+                    <div class="alloc-grid"><select id="p2_s2" onchange="upR(2,2)"><option value="high_div">高股息 ETF</option></select><input type="number" id="p2_r2" value="6.5"><input type="number" id="p2_w2" value="50"></div>
+                    <label style="margin-top:5px;">每月額外投入 (元)</label><input type="number" id="m2" value="50000">
+                </div>
+                <div class="phase-card" style="border-left-color: #27ae60;">
+                    <label>第三階段 (備戰期) | 年期: <input type="number" id="y3" value="5" style="width:40px; display:inline;"> 年</label>
+                    <div class="alloc-grid"><select id="p3_s1" onchange="upR(3,1)"><option value="deposit">台幣定存</option></select><input type="number" id="p3_r1" value="3.5"><input type="number" id="p3_w1" value="60"></div>
+                    <div class="alloc-grid"><select id="p3_s2" onchange="upR(3,2)"><option value="high_div">高股息 ETF</option></select><input type="number" id="p3_r2" value="6.5"><input type="number" id="p3_w2" value="40"></div>
+                    <label style="margin-top:5px;">每月額外投入 (元)</label><input type="number" id="m3" value="30000">
+                </div>
+            </div>
+        </div>
+
+        <div id="t2" class="tab-content">
+            <div class="section-box">
+                <label style="color:var(--r);">1. 遺產稅務設定</label>
+                <div class="input-row" style="margin-top:8px;">
+                    <div><label>免稅/扣除額 (萬)</label><input type="number" id="taxEx" value="2000"></div>
+                    <div><label>醫療加權通膨 %</label><input type="number" id="medInf" value="3.0"></div>
+                </div>
+                <p style="font-size:11px; color:#666;">* 系統於 75 歲後自動加權醫療成本通膨。</p>
+            </div>
+            <div class="section-box">
+                <label style="color:#2c3e50;">2. 重大一次性事件</label>
+                <div class="input-row" style="margin-top:8px;">
+                    <div><label>發生年齡</label><input type="number" id="evAge" value="70"></div>
+                    <div><label>金額 (萬，負表支出)</label><input type="number" id="evVal" value="-1000"></div>
+                </div>
+                <p style="font-size:11px; color:#666;">* 模擬大型資本支出 (如換房、子女創業金)。</p>
+            </div>
+        </div>
+
+        <div id="t3" class="tab-content">
+            <div class="section-box" style="border-color:var(--st);">
+                <label style="color:var(--st);">1. 四重壓力測試 (回檔年齡 / 跌幅%)</label>
+                <div class="input-row" style="margin-top:8px;">
+                    <input type="number" id="sa1" value="65"> <input type="number" id="sd1" value="20">
+                </div>
+                <div class="input-row">
+                    <input type="number" id="sa2" value="75"> <input type="number" id="sd2" value="15">
+                </div>
+                <div class="input-row">
+                    <input type="number" id="sa3" value="0"> <input type="number" id="sd3" value="0">
+                </div>
+                <div class="input-row">
+                    <input type="number" id="sa4" value="0"> <input type="number" id="sd4" value="0">
+                </div>
+            </div>
+            <div class="section-box" style="border-color:var(--s);">
+                <label style="color:var(--s);">2. 提領策略選擇</label>
+                <select id="strategy" onchange="toggleB()" style="margin:8px 0;"><option value="A">A: 本利均領 (領到完)</option><option value="B">B: 資產永續 (僅領配息)</option></select>
+                <div id="uiB" style="display:none;"><label>預設年配息率 %</label><input type="number" id="pRate" value="6.0"></div>
+                <div class="input-row" style="margin-top:8px;">
+                    <div><label>模擬結束年齡</label><input type="number" id="eAge" value="100"></div>
+                    <div><label>退休平均報酬 %</label><input type="number" id="retireRet" value="4.5"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="calc-btn" onclick="runCalc()">更新分析報告</button>
+            <button class="lock-btn" onclick="lockScenario()">鎖定方案對比</button>
+        </div>
+    </div>
+
+    <div class="main-display">
+        <div class="results-grid">
+            <div class="res-card" style="background:var(--p);">
+                <div class="val-label">退休高峰總資產</div>
+                <div id="res_p" class="val-large">$0</div>
+                <div class="val-label" id="res_p_age">65 歲名目價值</div>
+            </div>
+            <div class="res-card" style="background:var(--s);">
+                <div class="val-label">退休首月現金流</div>
+                <div id="res_w" class="val-large">$0</div>
+                <div class="val-label">隨通膨自動調整</div>
+            </div>
+            <div class="res-card" style="background:var(--r);">
+                <div class="val-label">傳承實質購買力</div>
+                <div id="res_r" class="val-large">$0</div>
+                <div class="val-label">已折現為今日價值</div>
+            </div>
+            <div class="res-card" style="background:#636e72;">
+                <div class="val-label">預估遺產稅 (台灣)</div>
+                <div id="res_t" class="val-large">$0</div>
+                <div class="val-label" id="res_t_rate">預估稅率: 0%</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="mainChart"></canvas>
+        </div>
+
+        <div id="reportSummary" style="background:#fff; border-radius:15px; padding:25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+            <h3 style="color:var(--p); margin:0 0 15px 0;">威龍顧問：全方位財富韌性分析</h3>
+            <div id="dynamicText" style="line-height:1.8; color:#444;">請點擊「更新分析報告」產出數據...</div>
+            <div style="margin-top:30px; border-top:1px dashed #ccc; padding-top:15px; display:flex; justify-content:space-between; font-size:12px; color:#999;">
+                <span>系統版本：2026.04 Final</span>
+                <span>分析日期：<span id="repDate"></span></span>
+                <span>威龍顧問專業簽章：__________________</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const BENCH = { "sp500": 10.5, "tw0050": 9.8, "high_div": 6.5, "deposit": 3.5 };
+    let myChart = null, lockedScenario = null;
+
+    function switchTab(id) {
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.getElementById('btn-' + id).classList.add('active');
+    }
+
+    function upR(p, r) {
+        const v = document.getElementById(`p${p}_s${r}`).value;
+        if(BENCH[v]) document.getElementById(`p${p}_r${r}`).value = BENCH[v];
+        runCalc();
+    }
+
+    function toggleB() { document.getElementById('uiB').style.display = (document.getElementById('strategy').value==='B') ? 'block':'none'; }
+
+    function lockScenario() {
+        lockedScenario = runCalc(true);
+        alert("目前的方案已鎖定為『對比基準』。您可以調整參數查看差異（如：提早退休、增加存額等）。");
+        runCalc();
+    }
+
+    function runCalc(isReturnOnly = false) {
+        if (typeof Chart === 'undefined') return;
+
+        const sAge = parseInt(document.getElementById('curAge').value);
+        const rAge = parseInt(document.getElementById('retAge').value);
+        const eAge = parseInt(document.getElementById('eAge').value) || 100;
+        const infBase = parseFloat(document.getElementById('infRate').value)/100;
+        const medAdd = parseFloat(document.getElementById('medInf').value)/100;
+        const taxEx = parseFloat(document.getElementById('taxEx').value)*10000;
+        const strategy = document.getElementById('strategy').value;
+        let w = parseFloat(document.getElementById('initP').value)*10000;
+
+        let labels = [], data = [], realData = [];
+        let curA = sAge;
+        let peakWAt65 = 0;
+        let baseMonthlyWithdraw = 0;
+
+        const stresses = [];
+        for(let i=1; i<=4; i++){
+            let sa = parseInt(document.getElementById('sa'+i).value);
+            let sd = parseFloat(document.getElementById('sd'+i).value)/100;
+            if(sa > 0 && sd > 0) stresses.push({age: sa, drop: sd});
+        }
+
+        const phases = [
+            { yrs: parseInt(document.getElementById('y1').value), mS: parseFloat(document.getElementById('m1').value), 
+              r: (parseFloat(document.getElementById('p1_r1').value)*parseFloat(document.getElementById('p1_w1').value) + parseFloat(document.getElementById('p1_r2').value)*parseFloat(document.getElementById('p1_w2').value))/10000/12 },
+            { yrs: parseInt(document.getElementById('y2').value), mS: parseFloat(document.getElementById('m2').value), 
+              r: (parseFloat(document.getElementById('p2_r1').value)*parseFloat(document.getElementById('p2_w1').value) + parseFloat(document.getElementById('p2_r2').value)*parseFloat(document.getElementById('p2_w2').value))/10000/12 },
+            { yrs: parseInt(document.getElementById('y3').value), mS: parseFloat(document.getElementById('m3').value), 
+              r: (parseFloat(document.getElementById('p3_r1').value)*parseFloat(document.getElementById('p3_w1').value) + parseFloat(document.getElementById('p3_r2').value)*parseFloat(document.getElementById('p3_w2').value))/10000/12 }
+        ];
+
+        let pIdx = 0, yInP = 0;
+
+        while (curA <= eAge) {
+            // 衝擊與一次性事件
+            stresses.forEach(s => { if(s.age === curA) w *= (1 - s.drop); });
+            if(curA === parseInt(document.getElementById('evAge').value)) w += parseFloat(document.getElementById('evVal').value)*10000;
+
+            if (curA < rAge) {
+                // 累積期：自動轉換三階段
+                if (pIdx < 3) {
+                    let cp = phases[pIdx];
+                    for(let m=1; m<=12; m++) w = (w + cp.mS) * (1 + cp.r);
+                    yInP++; if (yInP >= cp.yrs) { pIdx++; yInP = 0; }
+                } else {
+                    for(let m=1; m<=12; m++) w *= (1 + 0.05/12);
+                }
+            } else if (curA === rAge) {
+                peakWAt65 = w;
+                const rRetM = (parseFloat(document.getElementById('retireRet').value) || 4.5)/100/12;
+                const rMos = (eAge - rAge) * 12;
+                baseMonthlyWithdraw = (strategy === 'A') ? 
+                    (w * rRetM * Math.pow(1+rRetM, rMos))/(Math.pow(1+rRetM, rMos)-1) :
+                    (w * parseFloat(document.getElementById('pRate').value)/100)/12;
+            } else {
+                // 退休期：通膨與醫療加權
+                let curInflation = (curA >= 75) ? (infBase + medAdd) : infBase;
+                let actualMonthVal = baseMonthlyWithdraw * Math.pow(1 + curInflation, curA - rAge);
+                for(let m=1; m<=12; m++) {
+                    w -= actualMonthVal; if(w < 0) w = 0;
+                    w *= (1 + (parseFloat(document.getElementById('retireRet').value) || 4.5)/100/12);
+                }
+            }
+            
+            labels.push(curA + '歲');
+            data.push(Math.round(w));
+            realData.push(Math.round(w / Math.pow(1 + infBase, curA - sAge)));
+            curA++;
+        }
+
+        if(isReturnOnly) return data;
+
+        // 遺產稅 (10/15/20%)
+        let taxable = w - taxEx;
+        let tax = 0, taxRate = 0;
+        if(taxable > 0) {
+            if(taxable <= 50000000) { tax = taxable * 0.1; taxRate = 10; }
+            else if(taxable <= 100000000) { tax = 5000000 + (taxable-50000000)*0.15; taxRate = 15; }
+            else { tax = 12500000 + (taxable-100000000)*0.2; taxRate = 20; }
+        }
+
+        // 更新 UI 面板
+        document.getElementById('res_p').innerText = '$' + Math.round(peakWAt65).toLocaleString();
+        document.getElementById('res_p_age').innerText = rAge + " 歲退休名目高峰";
+        document.getElementById('res_w').innerText = '$' + Math.round(baseMonthlyWithdraw).toLocaleString();
+        document.getElementById('res_t').innerText = '$' + Math.round(tax).toLocaleString();
+        document.getElementById('res_t_rate').innerText = "適用邊際稅率: " + taxRate + "%";
+        document.getElementById('res_r').innerText = '$' + Math.round(realData[realData.length-1]).toLocaleString();
+        document.getElementById('repDate').innerText = new Date().toLocaleDateString();
+
+        document.getElementById('dynamicText').innerHTML = `
+            根據威龍顧問深度精算：<br>
+            1. <b>傳承安全性：</b> 透過三階段風險遞減配置，您在退休點預計持有資產 <b>$${Math.round(peakWAt65).toLocaleString()}</b>。考慮到 75 歲後的醫療通膨加權，目前計畫展現了極高的長壽韌性。<br>
+            2. <b>稅源預留建議：</b> 模擬結束時預計產生 <b>$${Math.round(tax).toLocaleString()}</b> 的遺產稅。若要完整保留資產予後代，建議透過『高額壽險』來預留稅源現金，避免後代需被迫處分資產。<br>
+            3. <b>實質價值觀測：</b> 雖然最終帳面遺產達數千萬，但其真實購買力僅約今日之 <b>$${Math.round(realData[realData.length-1]).toLocaleString()}</b>。這突顯了退休後仍需維持 4% 以上回報率以對沖通膨的必要性。
+        `;
+
+        // 繪圖渲染
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if(myChart) myChart.destroy();
+        
+        let ds = [
+            { label: '名目財富曲線 (帳面)', data: data, borderColor: '#1e3799', backgroundColor: 'rgba(30, 55, 153, 0.08)', fill: true, tension: 0.3, borderWidth: 3 },
+            { label: '實質購買力 (通膨折現)', data: realData, borderColor: '#27ae60', borderDash: [6,6], fill: false, tension: 0.3, borderWidth: 2 }
+        ];
+        if(lockedScenario) {
+            ds.push({ label: '對比方案 (鎖定基準)', data: lockedScenario, borderColor: '#ccc', borderDash: [2,2], fill: false, borderWidth: 1 });
+        }
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: labels, datasets: ds },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top', labels: { font: { size: 12 } } }, tooltip: { mode: 'index', intersect: false } },
+                scales: { 
+                    y: { ticks: { callback: v => '$' + (v/10000).toLocaleString() + '萬' }, grid: { color: '#f0f0f0' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    window.onload = function() { setTimeout(runCalc, 500); };
+</script>
+</body>
+</html>
